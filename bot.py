@@ -108,7 +108,7 @@ class CategoryMenu(discord.ui.View):
 
         ticket_category = discord.utils.get(
             guild.categories,
-            name="Проверки"
+            name="Запросы"
         )
 
         if ticket_category is None:
