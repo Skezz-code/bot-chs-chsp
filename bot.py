@@ -1,309 +1,273 @@
-import os
 import discord
 from discord.ext import commands
 
-TOKEN = os.getenv("DISCORD_TOKEN")
+TOKEN = "DISCORD_TOKEN"
 
-GUILD_ID = 1454624496337158366
-STAFF_ROLE_ID = 1454624496777429091
+PANEL_CHANNEL_ID = 1524792157616214146
+REPORT_CHANNEL_ID = 1525115259063373894
 
+CURATOR_ROLE_ID = 1524791916133351576
+PING_ROLE_ID = 1524791916133351576
 
 intents = discord.Intents.default()
-intents.members = True
 intents.message_content = True
 
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-bot = commands.Bot(
-    command_prefix="!",
-    intents=intents
+ticket_counter = 0
+
+
+class ReportModal(discord.ui.Modal, title="Подача жалобы"):
+
+    steamid = discord.ui.TextInput(
+        label="SteamID нарушителя",
+        placeholder="7656119XXXXXXXXXX",
+        required=True,
+        max_length=32
+    )
+
+    nickname = discord.ui.TextInput(
+        label="Ник нарушителя",
+        placeholder="Введите ник",
+        required=True,
+        max_length=50
+    )
+
+    punishment = discord.ui.TextInput(
+        label="ЧСС или ЧСП",
+        placeholder="Например: ЧСП",
+        required=True,
+        max_length=10
+    )
+
+    reason = discord.ui.TextInput(
+        label="Причина",
+        style=discord.TextStyle.paragraph,
+        required=True,
+        max_length=1000
+    )
+
+    evidence = discord.ui.TextInput(
+    label="📎 Доказательства",
+    placeholder="Видео — только YouTube, скриншоты — только yapx.ru. Вставьте ссылку сюда.",
+    required=True,
+    style=discord.TextStyle.paragraph,
+    max_length=1000
 )
 
+    async def on_submit(self, interaction: discord.Interaction):
+        global ticket_counter
 
-# -----------------------------
-# Запуск
-# -----------------------------
+        ticket_counter += 1
+
+        report_channel = bot.get_channel(REPORT_CHANNEL_ID)
+
+        embed = discord.Embed(
+            title=f"📋 Заявка #{ticket_counter}",
+            color=discord.Color.orange()
+        )
+
+        embed.set_author(
+            name=f"{interaction.user}",
+            icon_url=interaction.user.display_avatar.url
+        )
+
+        embed.add_field(
+            name="👤 Подал заявку",
+            value=interaction.user.mention,
+            inline=False
+        )
+
+        embed.add_field(
+            name="🆔 SteamID нарушителя",
+            value=self.steamid.value,
+            inline=False
+        )
+
+        embed.add_field(
+            name="🎮 Ник нарушителя",
+            value=self.nickname.value,
+            inline=False
+        )
+
+        embed.add_field(
+            name="⚖ Наказание",
+            value=self.punishment.value,
+            inline=False
+        )
+
+        embed.add_field(
+            name="📝 Причина",
+            value=self.reason.value,
+            inline=False
+        )
+
+        embed.add_field(
+            name="📎 Доказательства",
+            value=self.evidence.value,
+            inline=False
+        )
+
+        embed.set_thumbnail(
+            url=interaction.user.display_avatar.url
+        )
+
+        embed.set_footer(
+            text=f"ID автора: {interaction.user.id}"
+        )
+
+        await report_channel.send(
+            f"<@&{PING_ROLE_ID}>",
+            embed=embed,
+            view=ReviewButtons()
+        )
+
+        await interaction.response.send_message(
+            "✅ Ваша заявка успешно отправлена.",
+            ephemeral=True
+        )
+
+
+class CreateRequestView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Создать запрос",
+        emoji="📨",
+        style=discord.ButtonStyle.primary
+    )
+    async def create_request(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+        await interaction.response.send_modal(
+            ReportModal()
+        )
+
+
+class ReviewButtons(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Одобрить",
+        emoji="✅",
+        style=discord.ButtonStyle.success
+    )
+    async def approve(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+
+        curator_role = interaction.guild.get_role(
+            CURATOR_ROLE_ID
+        )
+
+        if curator_role not in interaction.user.roles:
+            return await interaction.response.send_message(
+                "❌ У вас нет доступа.",
+                ephemeral=True
+            )
+
+        embed = interaction.message.embeds[0]
+        embed = discord.Embed.from_dict(embed.to_dict())
+
+        embed.color = discord.Color.green()
+
+        embed.add_field(
+            name="✅ Решение",
+            value=f"Одобрено куратором {interaction.user.mention}",
+            inline=False
+        )
+
+        for item in self.children:
+            item.disabled = True
+
+        await interaction.message.edit(
+            embed=embed,
+            view=self
+        )
+
+        await interaction.response.send_message(
+            "Заявка одобрена.",
+            ephemeral=True
+        )
+
+    @discord.ui.button(
+        label="Отклонить",
+        emoji="❌",
+        style=discord.ButtonStyle.danger
+    )
+    async def reject(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+
+        curator_role = interaction.guild.get_role(
+            CURATOR_ROLE_ID
+        )
+
+        if curator_role not in interaction.user.roles:
+            return await interaction.response.send_message(
+                "❌ У вас нет доступа.",
+                ephemeral=True
+            )
+
+        embed = interaction.message.embeds[0]
+        embed = discord.Embed.from_dict(embed.to_dict())
+
+        embed.color = discord.Color.red()
+
+        embed.add_field(
+            name="❌ Решение",
+            value=f"Отклонено куратором {interaction.user.mention}",
+            inline=False
+        )
+
+        for item in self.children:
+            item.disabled = True
+
+        await interaction.message.edit(
+            embed=embed,
+            view=self
+        )
+
+        await interaction.response.send_message(
+            "Заявка отклонена.",
+            ephemeral=True
+        )
+
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def panel(ctx):
+
+    if ctx.channel.id != PANEL_CHANNEL_ID:
+        return await ctx.send(
+            f"Используй команду только в канале подачи."
+        )
+
+    embed = discord.Embed(
+        title="📋 Подача жалоб",
+        description=(
+            "Нажмите кнопку ниже для создания заявки."
+        ),
+        color=discord.Color.blurple()
+    )
+
+    await ctx.send(
+        embed=embed,
+        view=CreateRequestView()
+    )
+
 
 @bot.event
 async def on_ready():
-    print(f"Запущен как {bot.user}")
-
-    bot.add_view(CreateTicket())
-    bot.add_view(TicketButtons())
-
-    try:
-        guild = discord.Object(id=GUILD_ID)
-
-        synced = await bot.tree.sync(guild=guild)
-
-        print(f"Команд загружено: {len(synced)}")
-
-    except Exception as e:
-        print(f"Ошибка синхронизации: {e}")
-
-
-# -----------------------------
-# Создание запроса
-# -----------------------------
-
-class CreateTicket(discord.ui.View):
-
-    def __init__(self):
-        super().__init__(timeout=None)
-
-
-    @discord.ui.button(
-        label="➕ Создать запрос",
-        style=discord.ButtonStyle.green,
-        custom_id="create_ticket"
-    )
-    async def create(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-
-        await interaction.response.send_message(
-            "Выберите категорию:",
-            view=CategoryMenu(),
-            ephemeral=True
-        )
-
-
-# -----------------------------
-# Выбор категории
-# -----------------------------
-
-class CategoryMenu(discord.ui.View):
-
-    def __init__(self):
-        super().__init__(timeout=60)
-
-
-    @discord.ui.select(
-        placeholder="Тип запроса",
-        options=[
-            discord.SelectOption(
-                label="ЧСС",
-                emoji="🔴",
-                value="ch"
-            ),
-            discord.SelectOption(
-                label="ЧСП",
-                emoji="🟡",
-                value="chsp"
-            )
-        ]
-    )
-    async def select(
-        self,
-        interaction: discord.Interaction,
-        select: discord.ui.Select
-    ):
-
-        category = select.values[0]
-
-        guild = interaction.guild
-        user = interaction.user
-
-
-        ticket_category = discord.utils.get(
-            guild.categories,
-            name="Запросы"
-        )
-
-        if ticket_category is None:
-            ticket_category = await guild.create_category(
-                "Запросы"
-            )
-
-
-        for ch in ticket_category.channels:
-            if ch.topic == str(user.id):
-                await interaction.response.send_message(
-                    "У вас уже есть открытый запрос.",
-                    ephemeral=True
-                )
-                return
-
-
-        name = (
-            f"🔴чсс-{user.name}"
-            if category == "ch"
-            else
-            f"🟡чсп-{user.name}"
-        )
-
-
-        staff_role = guild.get_role(STAFF_ROLE_ID)
-
-
-        overwrites = {
-
-            guild.default_role:
-            discord.PermissionOverwrite(
-                view_channel=False
-            ),
-
-            user:
-            discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True
-            ),
-
-            guild.me:
-            discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True
-            )
-        }
-
-
-        if staff_role:
-            overwrites[staff_role] = discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True
-            )
-
-
-        channel = await guild.create_text_channel(
-            name=name,
-            category=ticket_category,
-            overwrites=overwrites,
-            topic=str(user.id)
-        )
-
-
-        embed = discord.Embed(
-    title="🔎 Новый запрос",
-    description=
-    """
-После создания запроса заполните форму:
-
-1. 👤 Упомяните себя (@ваш Discord аккаунт)
-
-2. 🎮 Укажите SteamID игрока
-
-3. 📝 Укажите причину добавления
-
-4. 📸 Прикрепите доказательства (скриншоты, видео и т.д.)
-""",
-    color=discord.Color.red()
-)
-
-        embed.add_field(
-            name="Пользователь",
-            value=user.mention
-        )
-
-        embed.add_field(
-            name="Категория",
-            value="ЧСC" if category == "ch" else "ЧСП"
-        )
-
-        embed.add_field(
-            name="Статус",
-            value="🟢 Открыт"
-        )
-
-
-        await channel.send(
-    content=f"{user.mention}, заполните форму выше.",
-    embed=embed,
-    view=TicketButtons()
-)
-
-
-        await interaction.response.send_message(
-            f"Создан канал {channel.mention}",
-            ephemeral=True
-        )
-
-
-# -----------------------------
-# Кнопки тикета
-# -----------------------------
-
-class TicketButtons(discord.ui.View):
-
-    def __init__(self):
-        super().__init__(timeout=None)
-
-
-    @discord.ui.button(
-        label="🛡 Взять запрос",
-        style=discord.ButtonStyle.blurple,
-        custom_id="claim"
-    )
-    async def claim(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-
-        await interaction.channel.send(
-            f"🛡 Проверяющий {interaction.user.mention} взял запрос."
-        )
-
-        await interaction.response.defer()
-
-
-
-    @discord.ui.button(
-        label="🔒 Закрыть",
-        style=discord.ButtonStyle.red,
-        custom_id="close"
-    )
-    async def close(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-
-        await interaction.channel.edit(
-            name=f"closed-{interaction.channel.name}"
-        )
-
-        await interaction.channel.send(
-            "🔒 Запрос закрыт."
-        )
-
-        await interaction.response.defer()
-
-
-
-# -----------------------------
-# Setup
-# -----------------------------
-
-@bot.tree.command(
-    name="setup",
-    description="Создать кнопку запросов",
-    guild=discord.Object(id=GUILD_ID)
-)
-async def setup(
-    interaction: discord.Interaction
-):
-
-    embed = discord.Embed(
-        title="📋 Проверка",
-        description=
-        "Нажмите кнопку ниже чтобы открыть запрос.\n\n"
-        "🔴 ЧСС\n"
-        "🟡 ЧСП",
-        color=discord.Color.blue()
-    )
-
-
-    await interaction.channel.send(
-        embed=embed,
-        view=CreateTicket()
-    )
-
-
-    await interaction.response.send_message(
-        "Готово",
-        ephemeral=True
-    )
+    print(f"Бот запущен как {bot.user}")
 
 
 bot.run(TOKEN)
