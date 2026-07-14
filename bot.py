@@ -19,7 +19,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 ticket_counter = 0
 
 
-class ReportModal(discord.ui.Modal, title="Подача жалобы"):
+class ReportModal(discord.ui.Modal, title="Подача заявки на ЧСС/ЧСП"):
 
     steamid = discord.ui.TextInput(
         label="SteamID нарушителя",
