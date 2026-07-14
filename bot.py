@@ -254,7 +254,7 @@ async def panel(ctx):
         )
 
     embed = discord.Embed(
-        title="📋 Подача жалоб",
+        title="📋 Подача заявки на ЧСС/ЧСП",
         description=(
             "Нажмите кнопку ниже для создания заявки."
         ),
