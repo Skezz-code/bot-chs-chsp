@@ -1,7 +1,8 @@
 import discord
 from discord.ext import commands
 
-TOKEN = "DISCORD_TOKEN"
+
+TOKEN = os.getenv("DISCORD_TOKEN")
 
 PANEL_CHANNEL_ID = 1525129785322504393
 REPORT_CHANNEL_ID = 1455306525286600807
