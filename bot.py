@@ -271,5 +271,207 @@ async def panel(ctx):
 async def on_ready():
     print(f"Бот запущен как {bot.user}")
 
+@bot.command(name="база")
+async def database(ctx):
+
+    channel = bot.get_channel(REPORT_CHANNEL_ID)
+
+    if channel is None:
+        return await ctx.send("❌ Канал заявок не найден.")
+
+    chsp = []
+    chss = []
+
+    async for message in channel.history(limit=None):
+
+        if not message.embeds:
+            continue
+
+        embed = message.embeds[0]
+
+        fields = {}
+
+        for field in embed.fields:
+            fields[field.name] = field.value
+
+
+        # Берём только одобренные заявки
+        decision = ""
+
+        for name, value in fields.items():
+            if "Решение" in name:
+                decision = value
+
+
+        if "Одобрено" not in decision:
+            continue
+
+
+        steamid = None
+        punishment = None
+
+
+        for name, value in fields.items():
+
+            if "SteamID" in name:
+                steamid = value
+
+            if "Наказание" in name:
+                punishment = value.upper()
+
+
+        if steamid and punishment:
+
+            if "ЧСП" in punishment:
+                if steamid not in chsp:
+                    chsp.append(steamid)
+
+            elif "ЧСС" in punishment:
+                if steamid not in chss:
+                    chss.append(steamid)
+
+
+
+    embed = discord.Embed(
+        title="📚 База ЧСС / ЧСП",
+        color=discord.Color.red()
+    )
+
+
+    embed.add_field(
+        name="🚫 ЧСП",
+        value="\n".join(chsp) if chsp else "Нет записей",
+        inline=False
+    )
+
+
+    embed.add_field(
+        name="⛔ ЧСС",
+        value="\n".join(chss) if chss else "Нет записей",
+        inline=False
+    )
+
+
+    embed.set_footer(
+        text=f"Всего записей: {len(chsp)+len(chss)}"
+    )
+
+
+    await ctx.send(embed=embed)
+
+
+
+
+@bot.command(name="проверить")
+async def check_steam(ctx, steamid=None):
+
+    if not steamid:
+        return await ctx.send(
+            "❌ Использование: `!проверить STEAMID`"
+        )
+
+
+    channel = bot.get_channel(REPORT_CHANNEL_ID)
+
+    if channel is None:
+        return await ctx.send("❌ Канал заявок не найден.")
+
+
+    async for message in channel.history(limit=None):
+
+        if not message.embeds:
+            continue
+
+
+        embed = message.embeds[0]
+
+        fields = {}
+
+        for field in embed.fields:
+            fields[field.name] = field.value
+
+
+        decision = ""
+
+        for name, value in fields.items():
+            if "Решение" in name:
+                decision = value
+
+
+        if "Одобрено" not in decision:
+            continue
+
+
+        saved_steam = None
+        punishment = "Не указано"
+        reason = "Не указана"
+
+
+        for name, value in fields.items():
+
+            if "SteamID" in name:
+                saved_steam = value
+
+            if "Наказание" in name:
+                punishment = value
+
+            if "Причина" in name:
+                reason = value
+
+
+
+        if saved_steam == steamid:
+
+
+            embed = discord.Embed(
+                title="🔎 Проверка SteamID",
+                color=discord.Color.red()
+            )
+
+
+            embed.add_field(
+                name="🆔 SteamID",
+                value=steamid,
+                inline=False
+            )
+
+
+            embed.add_field(
+                name="⚖ Наказание",
+                value=punishment,
+                inline=False
+            )
+
+
+            embed.add_field(
+                name="📝 Причина",
+                value=reason,
+                inline=False
+            )
+
+
+            embed.add_field(
+                name="👮 Решение",
+                value=decision,
+                inline=False
+            )
+
+
+            await ctx.send(embed=embed)
+            return
+
+
+
+    embed = discord.Embed(
+        title="🔎 Проверка SteamID",
+        description=(
+            f"✅ `{steamid}` не найден "
+            "в базе ЧСС/ЧСП"
+        ),
+        color=discord.Color.green()
+    )
+
+
+    await ctx.send(embed=embed)
 
 bot.run(TOKEN)
